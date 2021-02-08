@@ -1,0 +1,6 @@
+skip_docs
+# トークンの取得は firebase login:ci
+FIREBASE_CLI_TOKEN=""
+
+import "../android/fastlane/Fastfile"
+import "../ios/fastlane/Fastfile"
