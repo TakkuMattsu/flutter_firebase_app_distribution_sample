@@ -1,0 +1,85 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+default_platform(:ios)
+
+platform :ios do
+
+  $nowDate = DateTime.now
+  
+  desc "iOS Firebase App Distribution"
+  lane :firebase_app_distribuition do
+    # flutterの前処理
+    sh("flutter", "clean")
+    sh("flutter","pub", "get")
+    sh("flutter", "build", "ios", "--release")
+    # 配布用にアイコンを変えたりバージョンを変えたり
+    set_debug_info
+    # ビルド
+    build_app(
+      workspace: "ios/Runner.xcworkspace",
+      export_options: {
+        method: "ad-hoc",
+        provisioningProfiles: {
+          "！！！ここは適宜BundleIdentifierに変えてください！！！": "！！！ここは適宜プロビジョニングの名前に変えてください！！！"
+        }
+      },
+      clean: true,
+      export_xcargs: "-allowProvisioningUpdates",
+      output_name: "sample.ipa",
+      output_directory: "build/ios/"
+    )
+    # canagelog作成
+    sh('git log -n 1 > ./latest_commit_log.txt')
+    sh('cat ./latest_commit_log.txt')
+    # リリースノート
+    changelog = ENV['PWD'] + "/fastlane/latest_commit_log.txt"
+
+    # 配布
+    firebase_app_distribution(
+      app: "！！！ここは適宜かえてください！！！",
+      ipa_path: "build/ios/sample.ipa",
+      groups: "developer",
+      firebase_cli_token: FIREBASE_CLI_TOKEN,
+      release_notes_file: changelog)
+    # 変更差し戻し
+    sh("git", "checkout", "../ios")
+    sh("rm", "./latest_commit_log.txt")
+  end
+
+  # 配布用にアイコンを変えたり、バージョンをいじったり
+  def set_debug_info
+    # バージョン変更
+    version_change_for_timestamp
+    # アプリアイコン変更
+    original_short_version = get_version_number(xcodeproj: "ios/Runner.xcodeproj")
+      add_badge(
+        dark: true,
+        grayscale: true,
+        shield: original_short_version + "-" + $nowDate.strftime("%Y%m%d%H%M") + "-blue"
+      )
+  end
+
+  # タイムスタンプからビルドバージョンを作成
+  def version_change_for_timestamp
+    path = "ios/Runner/Info.plist"
+    # CFBundleVersionを日付ベースに書き換え
+    set_info_plist_value(
+      path: path,
+      key: "CFBundleVersion",
+      value: $nowDate.strftime("%y%m%d.%H%M")
+    )
+  end
+end
