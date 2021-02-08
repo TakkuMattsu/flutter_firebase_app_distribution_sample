@@ -1,0 +1,55 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+default_platform(:android)
+
+platform :android do
+
+  $nowDate = DateTime.now
+
+  desc "Android Firebase App Distribution"
+  lane :firebase_app_distribuition
+    build_number = $nowDate.strftime("%m%d%H%M")
+    sh( "flutter","clean" )
+    sh( "flutter","pub", "get")
+    sh( "flutter","build","apk","--release", "--build-number", build_number)
+    # バージョンの取得に https://github.com/Jems22/fastlane-plugin-get-version-name を利用しようと思ったが、flutterでは
+    # local.propertiesのflutter.versionNameが利用されるため取得できなかった
+    # なので https://github.com/tianhaoz95/fastlane-plugin-flutter_version を利用
+    add_badge(
+        dark: true,
+        grayscale: true,
+        shield: flutter_version(pubspec_location: "./pubspec.yaml")["version_name"] + "-" + $nowDate.strftime("%Y%m%d%H%M") + "-blue",
+        glob: "/android/app/src/main/res/*/ic_launcher.png"
+      )
+    # canagelog作成
+    sh('git log -n 1 > ./latest_commit_log.txt')
+    sh('cat ./latest_commit_log.txt')
+    # リリースノート
+    changelog = ENV['PWD'] + "/fastlane/latest_commit_log.txt"
+
+    # 配布
+    firebase_app_distribution(
+      apk_path: "build/app/outputs/flutter-apk/!!ここは適宜変えてください!!.apk",
+      app: "！！！ここは適宜かえてください！！！",
+      firebase_cli_token: FIREBASE_CLI_TOKEN,
+      groups: "developer",
+      release_notes_file: changelog
+    )
+    # 変更差し戻し
+    sh("git", "checkout", "../android")
+    sh("rm", "./latest_commit_log.txt")
+  end
+end
